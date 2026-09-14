@@ -1,0 +1,16 @@
+{
+  "name": "emotion-detection-vit-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser frontend that displays Vision Transformer emotion-detection model output.",
+  "scripts": {
+    "start": "node tools/mock-api.mjs",
+    "static": "python3 -m http.server 8080",
+    "build": "node scripts/build.mjs",
+    "test": "node --test \"tests/**/*.test.mjs\""
+  },
+  "engines": {
+    "node": ">=20.11"
+  }
+}

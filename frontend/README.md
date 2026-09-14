@@ -162,6 +162,7 @@ js/parse.js           turns either service's response into one prediction model
 js/render.js          DOM rendering for every result view
 js/emotions.js        canonical emotions, the backend's label aliases, colours, emoji
 js/format.js          percentage, duration, byte, and time formatting
+js/files.js           which drag events and files the page accepts as input
 js/config.js          settings defaults, validation, URL overrides
 js/history.js         recent inference records in localStorage
 js/thumbnail.js       canvas thumbnail generation
@@ -182,7 +183,7 @@ bars always sum to 100%.
 ## Develop
 
 ```bash
-npm test        # 56 tests over parsing, formatting, config, API, history, and markup
+npm test        # 65 tests over parsing, formatting, config, API, history, files, and markup
 npm run build   # copies index.html, styles.css, and js/ into dist/
 ```
 

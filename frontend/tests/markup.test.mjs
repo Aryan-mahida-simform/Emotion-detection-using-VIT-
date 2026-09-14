@@ -7,10 +7,18 @@ import { ELEMENT_IDS } from "../js/render.js";
 
 const root = resolve(import.meta.dirname, "..");
 const markup = await readFile(resolve(root, "index.html"), "utf8");
+const styles = await readFile(resolve(root, "styles.css"), "utf8");
 
 test("every element the renderer needs exists in the markup", () => {
   const missing = ELEMENT_IDS.filter((id) => !new RegExp(`id="${id}"`).test(markup));
   assert.deepEqual(missing, [], `index.html is missing: ${missing.join(", ")}`);
+});
+
+test("the stylesheet keeps the hidden attribute ahead of every class that sets display", () => {
+  const rule = styles.match(/\[hidden\]\s*\{([^}]*)\}/);
+
+  assert.ok(rule, "styles.css has no [hidden] rule");
+  assert.match(rule[1], /display:\s*none\s*!important/);
 });
 
 test("the page loads the application module and its stylesheet", () => {

@@ -9,6 +9,7 @@ import {
 import { addEntry, clearHistory, loadHistory, makeEntry, saveHistory } from "./history.js";
 import { ModelOutputError } from "./parse.js";
 import { formatBytes } from "./format.js";
+import { carriesFiles, firstFile, isImageFile } from "./files.js";
 import * as view from "./render.js";
 import { createThumbnail } from "./thumbnail.js";
 
@@ -57,6 +58,7 @@ function bindEvents() {
     }
   });
   ui.dropzone.addEventListener("dragover", (event) => {
+    if (!carriesFiles(event)) return;
     event.preventDefault();
     ui.dropzone.dataset.active = "true";
   });
@@ -64,9 +66,23 @@ function bindEvents() {
     delete ui.dropzone.dataset.active;
   });
   ui.dropzone.addEventListener("drop", (event) => {
+    if (!carriesFiles(event)) return;
     event.preventDefault();
     delete ui.dropzone.dataset.active;
-    const file = event.dataTransfer?.files?.[0];
+    const file = firstFile(event);
+    if (file) void acceptFile(file);
+  });
+
+  // The browser's default action for a dropped file is to open it, which
+  // navigates away from the page.
+  window.addEventListener("dragover", (event) => {
+    if (carriesFiles(event)) event.preventDefault();
+  });
+  window.addEventListener("drop", (event) => {
+    if (!carriesFiles(event)) return;
+    event.preventDefault();
+    if (ui.dropzone.contains(event.target)) return;
+    const file = firstFile(event);
     if (file) void acceptFile(file);
   });
 
@@ -135,7 +151,7 @@ function bindEvents() {
 }
 
 async function acceptFile(file) {
-  if (!file.type.startsWith("image/")) {
+  if (!isImageFile(file)) {
     view.showToast(ui, "That file is not an image.");
     return;
   }
@@ -182,15 +198,17 @@ async function startCamera() {
   }
 
   try {
-    app.stream = await navigator.mediaDevices.getUserMedia({
+    const stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
       audio: false,
     });
-    ui.cameraVideo.srcObject = app.stream;
+    app.stream = stream;
+    ui.cameraVideo.srcObject = stream;
     await ui.cameraVideo.play();
     ui.cameraPanel.hidden = false;
     ui.cameraButton.disabled = true;
   } catch (error) {
+    stopCamera();
     view.showToast(ui, `Camera unavailable: ${error?.message ?? "permission denied"}.`);
   }
 }
@@ -198,6 +216,7 @@ async function startCamera() {
 function stopCamera() {
   for (const track of app.stream?.getTracks() ?? []) track.stop();
   app.stream = null;
+  ui.cameraVideo.pause();
   ui.cameraVideo.srcObject = null;
   ui.cameraPanel.hidden = true;
   ui.cameraButton.disabled = false;
@@ -374,10 +393,6 @@ async function checkService() {
     return;
   }
   view.setServiceStatus(ui, "offline", "Model service not reachable. Check the settings panel");
-}
-
-init();
-eck the settings panel");
 }
 
 init();

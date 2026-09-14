@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
@@ -9,6 +10,7 @@ const MODULES = [
   "api",
   "config",
   "emotions",
+  "files",
   "format",
   "history",
   "parse",
@@ -21,6 +23,12 @@ test("every module loads without touching the DOM at import time", async () => {
     const namespace = await import(`../js/${name}.js`);
     assert.ok(Object.keys(namespace).length > 0, `js/${name}.js exports nothing`);
   }
+});
+
+test("the module the page loads on startup is valid JavaScript", () => {
+  const check = spawnSync(process.execPath, ["--check", resolve(root, "js", "app.js")], { encoding: "utf8" });
+
+  assert.equal(check.status, 0, `js/app.js does not parse:\n${check.stderr}`);
 });
 
 test("the modules the app wires together still expose the names it imports", async () => {

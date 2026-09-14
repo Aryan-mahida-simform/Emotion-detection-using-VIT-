@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>Emotion detection with ViT: model output viewer</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#result">Skip to model output</a>
+
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">ViT</span>
+        <div>
+          <h1>Emotion Detection using ViT</h1>
+          <p class="tagline">Send a face to the Vision Transformer and read what the model predicted.</p>
+        </div>
+      </div>
+      <p class="service-status" id="serviceStatus" data-state="checking">
+        <span class="dot" aria-hidden="true"></span>
+        <span id="serviceStatusText">Checking the model service…</span>
+      </p>
+    </header>
+
+    <p class="banner" id="bootBanner" hidden>
+      The interface script did not load. Serve this folder over HTTP (for example <code>npm start</code>) instead of opening the file directly.
+    </p>
+
+    <main class="layout">
+      <section class="panel" aria-labelledby="inputHeading">
+        <h2 id="inputHeading">1. Provide an image</h2>
+
+        <div class="dropzone" id="dropzone" role="button" tabindex="0" aria-describedby="dropzoneHint">
+          <p class="dropzone-title">Drop a face image here</p>
+          <p class="dropzone-hint" id="dropzoneHint">PNG, JPEG or WebP. Click to browse, or paste from the clipboard.</p>
+        </div>
+        <input class="visually-hidden" id="fileInput" type="file" accept="image/png,image/jpeg,image/webp,image/*" />
+
+        <div class="row">
+          <button type="button" class="primary" id="analyseButton" disabled>Analyse</button>
+          <button type="button" id="cameraButton">Use camera</button>
+          <button type="button" class="ghost" id="clearButton">Clear</button>
+        </div>
+
+        <div class="camera" id="cameraPanel" hidden>
+          <video id="cameraVideo" playsinline muted></video>
+          <canvas id="cameraCanvas" hidden></canvas>
+          <div class="row">
+            <button type="button" class="primary" id="captureButton">Capture frame</button>
+            <button type="button" class="ghost" id="stopCameraButton">Stop camera</button>
+          </div>
+        </div>
+
+        <details class="settings" id="settingsPanel">
+          <summary>Model service settings</summary>
+          <label class="field">
+            Predict endpoint
+            <input id="endpointInput" type="text" autocomplete="off" spellcheck="false" placeholder="/predict" />
+          </label>
+          <label class="field">
+            Multipart field name
+            <input id="fieldInput" type="text" autocomplete="off" spellcheck="false" placeholder="file" />
+          </label>
+          <label class="field">
+            Warn when the top emotion is below (%)
+            <input id="thresholdInput" type="number" min="0" max="100" step="1" />
+          </label>
+          <div class="row">
+            <button type="button" class="primary" id="saveSettingsButton">Save</button>
+            <button type="button" class="ghost" id="resetSettingsButton">Reset to defaults</button>
+          </div>
+          <p class="hint" id="settingsHint"></p>
+        </details>
+      </section>
+
+      <section class="panel" aria-labelledby="previewHeading">
+        <h2 id="previewHeading">2. Preview</h2>
+        <figure class="preview" id="previewFigure">
+          <div class="preview-frame" id="previewFrame">
+            <img id="previewImage" alt="" hidden />
+            <div class="faces-overlay" id="facesOverlay" aria-hidden="true"></div>
+          </div>
+          <p class="preview-empty" id="previewEmpty">No image selected yet.</p>
+          <figcaption class="preview-caption" id="previewCaption"></figcaption>
+        </figure>
+      </section>
+
+      <section class="panel results" id="result" aria-labelledby="resultHeading" aria-busy="false">
+        <h2 id="resultHeading">3. Model output</h2>
+
+        <p class="state" data-state-panel="idle">Nothing analysed yet. Pick an image, then press Analyse.</p>
+
+        <div class="state loading" data-state-panel="loading" hidden>
+          <span class="spinner" aria-hidden="true"></span>
+          <p>Running the Vision Transformer…</p>
+          <button type="button" class="ghost" id="cancelButton">Cancel</button>
+        </div>
+
+        <div class="state error" data-state-panel="error" hidden>
+          <p class="error-title" id="errorTitle"></p>
+          <p class="error-code" id="errorCode" hidden></p>
+          <pre class="error-detail" id="errorDetail" hidden></pre>
+          <button type="button" id="retryButton">Try again</button>
+        </div>
+
+        <div class="state success" data-state-panel="success" hidden>
+          <div class="verdict">
+            <span class="verdict-glyph" id="topGlyph" aria-hidden="true"></span>
+            <div class="verdict-text">
+              <span class="verdict-caption">Top emotion</span>
+              <span class="verdict-value" id="topLabel">—</span>
+            </div>
+            <span class="verdict-confidence" id="topConfidence">—</span>
+          </div>
+
+          <p class="warning" id="lowConfidenceWarning" hidden></p>
+
+          <section class="affect" id="affectPanel" hidden aria-labelledby="affectHeading">
+            <h3 id="affectHeading">Affect</h3>
+            <div class="affect-grid">
+              <div class="affect-item">
+                <span class="affect-term">Valence</span>
+                <span class="affect-value" id="affectValence">—</span>
+                <div class="bar-track"><div class="bar-fill affect-valence" id="affectValenceBar"></div></div>
+                <span class="affect-scale"><span>-1 unpleasant</span><span>+1 pleasant</span></span>
+              </div>
+              <div class="affect-item">
+                <span class="affect-term">Arousal</span>
+                <span class="affect-value" id="affectArousal">—</span>
+                <div class="bar-track"><div class="bar-fill affect-arousal" id="affectArousalBar"></div></div>
+                <span class="affect-scale"><span>0 calm</span><span>1 activated</span></span>
+              </div>
+            </div>
+          </section>
+
+          <ol class="faces" id="facesList" hidden></ol>
+
+          <div class="bars" id="bars" role="list" aria-label="Emotion probabilities"></div>
+
+          <dl class="meta" id="meta"></dl>
+
+          <div class="row">
+            <button type="button" id="copyJsonButton">Copy JSON</button>
+            <button type="button" id="exportJsonButton">Export JSON</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel history" aria-labelledby="historyHeading">
+        <div class="panel-head">
+          <h2 id="historyHeading">Recent inferences</h2>
+          <button type="button" class="ghost" id="clearHistoryButton">Clear</button>
+        </div>
+        <p class="empty" id="historyEmpty">Results you run appear here.</p>
+        <ol class="history-list" id="historyList"></ol>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <p>Frontend for the Vision Transformer emotion model. Setup and API contract: <code>README.md</code>.</p>
+    </footer>
+
+    <p class="toast" id="toast" role="status" aria-live="polite" hidden></p>
+
+    <script>
+      window.addEventListener("load", function () {
+        if (!window.__emotionAppBooted) {
+          document.getElementById("bootBanner").hidden = false;
+        }
+      });
+    </script>
+    <script type="module" src="js/app.js"></script>
+  </body>
+</html>

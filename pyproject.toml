@@ -1,0 +1,9 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+markers = [
+  "vit: needs torch, transformers and checkpoint weights on disk",
+]
+filterwarnings = [
+  "ignore:Using `httpx` with `starlette.testclient` is deprecated:DeprecationWarning",
+]

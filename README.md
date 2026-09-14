@@ -26,40 +26,89 @@ app/          FastAPI application: routes, backends, schemas, evaluation
 app/spa.py    serves the page at / from the same process as the API
 frontend/     the browser page: plain HTML, CSS and ES modules, no dependencies
 frontend/js/  page logic, including the response parser
-scripts/      dataset samples and the evaluation CLI
+scripts/      dataset samples, the evaluation CLI, and dev.sh (both servers)
 tests/        pytest suites, including the page and API integration test
 docs/adr/     decisions this repository settled
 ```
 
 ## Install
 
+Python dependencies go in a virtual environment, never in the system interpreter:
+
 ```bash
-python -m pip install -r requirements.txt
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements-dev.txt
+# or
+make venv
 ```
 
-`requirements.txt` covers the API and the tests. PyTorch and transformers are separate, because the
-service runs without them:
+`requirements-dev.txt` is `requirements.txt` plus pytest and httpx. Every `make` target and
+`scripts/dev.sh` pick the venv up automatically once it exists.
+
+PyTorch and transformers are separate, because the service runs without them:
 
 ```bash
-python -m pip install -r requirements-vit.txt
+.venv/bin/python -m pip install -r requirements-vit.txt
+# or
+make install-vit PYTHON=.venv/bin/python
 ```
 
 The page needs no install and no build step.
 
 ## Run
 
+One command starts both servers, waits for each to answer, and prints their URLs:
+
 ```bash
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+bash scripts/dev.sh
 # or
-make run
+make dev
 ```
 
-Then open <http://127.0.0.1:8000/> for the page and <http://127.0.0.1:8000/docs> for the API docs.
-The page posts to `/predict` and `/health` relative to the origin it was loaded from, which is this
-same process.
+```
+URLs
+  page        http://127.0.0.1:8000/          served by the API
+  API docs    http://127.0.0.1:8000/docs
+  page        http://127.0.0.1:8080/?endpoint=http://127.0.0.1:8000
+              the same page on its own port, posting to the API above
+```
+
+Two URLs, because the app can be reached two ways and they are not interchangeable:
+
+| URL | What it is |
+| --- | --- |
+| <http://127.0.0.1:8000/> | The page served by the API process, which is how the app is meant to run. The page posts to `/predict` and `/health` relative to the origin it was loaded from, so nothing is configured. |
+| <http://127.0.0.1:8080/?endpoint=http://127.0.0.1:8000> | The same page on its own static server, pointed at the API through the query string. Use it when you want to reload the page without touching the API process. It crosses origins, which the API allows through `EMOTION_API_CORS_ORIGINS`. The endpoint, the multipart field name and the timeout are also settable in the page's settings panel, which stores them in the browser; [`frontend/README.md`](frontend/README.md) lists every parameter. |
+
+Useful flags and overrides: `scripts/dev.sh --api-only` and `--web-only` start one side,
+`API_PORT` and `WEB_PORT` move the ports, `VENV_DIR` names the environment, and `PYTHON` pins the
+interpreter. `Ctrl-C` stops both servers.
+
+The API alone is still worth running on its own:
+
+```bash
+.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+# or
+make run PYTHON=.venv/bin/python
+```
 
 With no page in the checkout, `/` answers the service banner instead, so the API stays usable on its
 own. `GET /service` always answers the banner.
+
+To check a running instance without a browser:
+
+```bash
+curl -s http://127.0.0.1:8000/health
+curl -s -F "file=@face.png" http://127.0.0.1:8000/predict
+```
+
+`scripts/make_samples.py` writes throwaway placeholder images when you have no face photos to hand;
+they exercise the transport, not the model.
+
+```bash
+.venv/bin/python -m scripts.make_samples --output /tmp/samples
+curl -s -F "file=@/tmp/samples/happy/patch-000.png" http://127.0.0.1:8000/predict
+```
 
 ## Endpoints
 
@@ -206,9 +255,9 @@ Every setting is an `EMOTION_API_*` environment variable with a default in `app/
 ## Tests
 
 ```bash
-python -m pytest                      # the API, the evaluation code, and the page integration
-node --test "frontend/tests/**/*.test.mjs"   # the page's own suites
-make test-all                         # both
+.venv/bin/python -m pytest                    # the API, the evaluation code, and the page integration
+node --test "frontend/tests/**/*.test.mjs"    # the page's own suites
+make test-all                                 # both
 ```
 
 The default suite needs no weights and no network. It covers the label vocabulary, settings
@@ -226,10 +275,10 @@ browser. It skips the node-backed cases when node is not installed.
 Checkpoint tests are marked `vit` and skip unless you name a model:
 
 ```bash
-pip install -r requirements-vit.txt
+.venv/bin/python -m pip install -r requirements-vit.txt
 EMOTION_API_TEST_MODEL_ID=dima806/facial_emotions_image_detection \
 EMOTION_API_TEST_ALLOW_DOWNLOAD=1 \
-python -m pytest -m vit
+.venv/bin/python -m pytest -m vit
 ```
 
 They assert that the checkpoint loads, reports one label per output, and returns finite scores whose

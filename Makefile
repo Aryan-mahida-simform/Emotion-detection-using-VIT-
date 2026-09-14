@@ -1,13 +1,20 @@
-PYTHON ?= python3
+VENV ?= .venv
+# Every target runs from the venv once `make venv` has created it, and from the
+# system interpreter before that.
+PYTHON ?= $(shell test -x $(VENV)/bin/python && echo $(VENV)/bin/python || echo python3)
 PORT ?= 8000
 DATA_DIR ?= data/sample
 NODE ?= node
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install install-vit install-dev check test test-all test-vit web web-test run samples evaluate clean
+.PHONY: help venv dev dev-api dev-web install install-vit install-dev check test test-all test-vit web web-test run samples evaluate clean
 
 help:
+	@echo "venv         create .venv and install the API and test dependencies into it"
+	@echo "dev          start the API and the page locally and print their URLs"
+	@echo "dev-api      start only the API (page served at /)"
+	@echo "dev-web      start only the standalone page server"
 	@echo "install      install the API and test dependencies"
 	@echo "install-vit  add torch, torchvision and transformers"
 	@echo "install-dev  add pytest and httpx"
@@ -21,6 +28,20 @@ help:
 	@echo "samples      write placeholder images to $(DATA_DIR)"
 	@echo "evaluate     score $(DATA_DIR) and print the metrics"
 	@echo "clean        drop caches, generated reports and the page build"
+
+venv:
+	python3 -m venv $(VENV)
+	$(VENV)/bin/python -m pip install --upgrade pip
+	$(VENV)/bin/python -m pip install -r requirements-dev.txt
+
+dev:
+	bash scripts/dev.sh
+
+dev-api:
+	bash scripts/dev.sh --api-only
+
+dev-web:
+	bash scripts/dev.sh --web-only
 
 install:
 	$(PYTHON) -m pip install -r requirements.txt
